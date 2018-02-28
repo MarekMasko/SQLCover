@@ -14,14 +14,17 @@ namespace SQLCover
     public class CoverageResult : CoverageSummary
     {
         private readonly IEnumerable<Batch> _batches;
-        private readonly string _database;
+
+        public string DatabaseName { get; }
+        public string DataSource { get; }
 
         private readonly StatementChecker _statementChecker = new StatementChecker();
 
-        public CoverageResult(IEnumerable<Batch> batches, List<string> xml, string database)
+        public CoverageResult(IEnumerable<Batch> batches, List<string> xml, string database, string dataSource)
         {
             _batches = batches;
-            _database = database;
+            DatabaseName = database;
+            DataSource = dataSource;
             var parser = new EventsParser(xml);
 
             var statement = parser.GetNextStatement();
@@ -146,6 +149,26 @@ namespace SQLCover
             }
         }
 
+        /// <summary>
+        /// https://raw.githubusercontent.com/jenkinsci/cobertura-plugin/master/src/test/resources/hudson/plugins/cobertura/coverage-with-data.xml
+        /// http://cobertura.sourceforge.net/xml/coverage-03.dtd
+        /// </summary>
+        /// <returns></returns>
+        public string Cobertura()
+        {
+            var statements = _batches.Sum(p => p.StatementCount);
+            var coveredStatements = _batches.Sum(p => p.CoveredStatementCount);
+
+            var builder = new StringBuilder();
+            builder.Append("<?xml version=\"1.0\"?>");
+            builder.Append("<!--DOCTYPE coverage SYSTEM \"http://cobertura.sourceforge.net/xml/coverage-03.dtd\"-->");
+            builder.AppendFormat("<coverage lines-valid=\"{0}\" lines-covered=\"{1}\" line-rate=\"{2}\" branch-rate=\"0.0\" version=\"1.9\" timestamp=\"{3}\">", statements, coveredStatements,coveredStatements / (float)statements, (DateTime.UtcNow - new DateTime(1970, 1, 1)).TotalSeconds);
+            builder.Append("<coverage>\r\n");
+
+            return builder.ToString();
+
+        }
+
         public string OpenCoverXml()
         {
             var statements = _batches.Sum(p => p.StatementCount);
@@ -159,8 +182,8 @@ namespace SQLCover
                 , statements, coveredStatements, coveredStatements / (float) statements * 100.0);
 
             builder.Append("<Module hash=\"ED-DE-ED-DE-ED-DE-ED-DE-ED-DE-ED-DE-ED-DE-ED-DE-ED-DE-ED-DE\">");
-            builder.AppendFormat("<FullName>{0}</FullName>", _database);
-            builder.AppendFormat("<ModuleName>{0}</ModuleName>", _database);
+            builder.AppendFormat("<FullName>{0}</FullName>", DatabaseName);
+            builder.AppendFormat("<ModuleName>{0}</ModuleName>", DatabaseName);
 
             var fileMap = new Dictionary<string, int>();
             var i = 1;
